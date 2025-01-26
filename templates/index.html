@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remik</title>
+</head>
+<body>
+    <h1>Witaj w grze Remik!</h1>
+    <button onclick="startGame()">Rozpocznij grę</button>
+    <div id="gameOutput"></div>
+    <div id="playerActions" style="display: none;">
+        <h2>Akcje gracza</h2>
+        <p>Aktualny gracz: <span id="currentPlayer"></span></p>
+        <button id="drawCardButton" onclick="drawCard()">Dobierz kartę</button>
+        <select id="discardSelect" disabled></select>
+        <button id="discardCardButton" onclick="discardCard()" disabled>Wyrzuć kartę</button>
+    </div>
+    <p id="errorMessage" style="color: red;"></p>
+
+    <script>
+        let rekaGracza1 = [];
+        let rekaGracza2 = [];
+        let aktualnyGracz = 1;
+
+        function startGame() {
+            fetch("/start_game")
+                .then(response => response.json())
+                .then(data => {
+                    rekaGracza1 = data.reka_gracza_1;
+                    rekaGracza2 = data.reka_gracza_2;
+                    aktualnyGracz = data.aktualny_gracz;
+
+                    document.getElementById("gameOutput").innerHTML = `
+                        <h2>Karty Gracza 1</h2>
+                        <ul>${rekaGracza1.map(karta => `<li>${karta}</li>`).join('')}</ul>
+                        <h2>Karty Gracza 2</h2>
+                        <ul>${rekaGracza2.map(karta => `<li>${karta}</li>`).join('')}</ul>
+                        <h2>Wierzchnia karta na stosie: ${data.stos}</h2>
+                    `;
+                    document.getElementById("playerActions").style.display = "block";
+                    document.getElementById("currentPlayer").textContent = aktualnyGracz;
+                    enableDrawCard();
+                });
+        }
+
+        function drawCard() {
+            fetch("/draw_card", { method: "POST" })
+                .then(response => response.json())
+                .then(data => {
+                    const dobieranaKarta = data.dobrana_karta;
+                    if (aktualnyGracz === 1) {
+                        rekaGracza1.push(dobieranaKarta);
+                    } else {
+                        rekaGracza2.push(dobieranaKarta);
+                    }
+                    updateUI();
+                    enableDiscardCard();
+                })
+                .catch(err => showError(err));
+        }
+
+        function discardCard() {
+            const selectedCard = document.getElementById("discardSelect").value;
+            fetch("/discard_card", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ karta: selectedCard })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (aktualnyGracz === 1) {
+                        rekaGracza1 = rekaGracza1.filter(k => k !== selectedCard);
+                    } else {
+                        rekaGracza2 = rekaGracza2.filter(k => k !== selectedCard);
+                    }
+                    aktualnyGracz = data.aktualny_gracz;
+                    updateUI();
+                    enableDrawCard();
+                })
+                .catch(err => showError(err));
+        }
+
+        function updateUI() {
+            document.getElementById("gameOutput").innerHTML = `
+                <h2>Karty Gracza 1</h2>
+                <ul>${rekaGracza1.map(karta => `<li>${karta}</li>`).join('')}</ul>
+                <h2>Karty Gracza 2</h2>
+                <ul>${rekaGracza2.map(karta => `<li>${karta}</li>`).join('')}</ul>
+            `;
+            document.getElementById("currentPlayer").textContent = aktualnyGracz;
+            updateDiscardSelect();
+        }
+
+        function enableDrawCard() {
+            document.getElementById("drawCardButton").disabled = false;
+            document.getElementById("discardSelect").disabled = true;
+            document.getElementById("discardCardButton").disabled = true;
+        }
+
+        function enableDiscardCard() {
+            document.getElementById("drawCardButton").disabled = true;
+            document.getElementById("discardSelect").disabled = false;
+            document.getElementById("discardCardButton").disabled = false;
+        }
+
+        function updateDiscardSelect() {
+            const select = document.getElementById("discardSelect");
+            select.innerHTML = "";
+            const karty = aktualnyGracz === 1 ? rekaGracza1 : rekaGracza2;
+            karty.forEach(karta => {
+                const option = document.createElement("option");
+                option.value = karta;
+                option.textContent = karta;
+                select.appendChild(option);
+            });
+        }
+
+        function showError(error) {
+            document.getElementById("errorMessage").textContent = error.message || "Wystąpił błąd!";
+        }
+    </script>
+</body>
+</html>
