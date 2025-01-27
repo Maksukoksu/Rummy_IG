@@ -1,5 +1,5 @@
 from flask import Flask, render_template, jsonify, request
-from game_logic import stworz_talie, rozdaj_karty
+from game_logic import stworz_talie, rozdaj_karty, punktacja_karty
 
 app = Flask(__name__)
 
@@ -7,9 +7,9 @@ app = Flask(__name__)
 talia = []
 reka_gracza_1 = []
 reka_gracza_2 = []
-stos = []
-aktualny_gracz = 1  # 1 oznacza Gracza 1, 2 oznacza Gracza 2
-karta_dobrana = False  # Flaga oznaczająca, czy gracz dobrał już kartę w swojej turze
+stos = []  # Stos kart wyrzuconych
+aktualny_gracz = 1
+karta_dobrana = False
 
 
 @app.route("/")
@@ -22,12 +22,15 @@ def start_game():
     global talia, reka_gracza_1, reka_gracza_2, stos, aktualny_gracz, karta_dobrana
     talia = stworz_talie()
     reka_gracza_1, reka_gracza_2, stos = rozdaj_karty(talia)
-    aktualny_gracz = 1  # Grę zaczyna Gracz 1
+    aktualny_gracz = 1
     karta_dobrana = False
+    stos = []  # Resetujemy stos kart wyrzuconych
     return jsonify({
         "reka_gracza_1": reka_gracza_1,
+        "punkty_gracza_1": sum(punktacja_karty(karta) for karta in reka_gracza_1),
         "reka_gracza_2": reka_gracza_2,
-        "stos": stos[-1],  # Pokazujemy wierzchnią kartę stosu
+        "punkty_gracza_2": sum(punktacja_karty(karta) for karta in reka_gracza_2),
+        "stos": None,  # Brak wyrzuconych kart na początku
         "aktualny_gracz": aktualny_gracz
     })
 
@@ -42,18 +45,22 @@ def draw_card():
     if not talia:
         return jsonify({"error": "Brak kart w talii!"}), 400
 
-    karta = talia.pop(0)  # Dobieramy pierwszą kartę z talii
+    # Losowe dobieranie karty z talii
+    import random
+    index = random.randint(0, len(talia) - 1)
+    karta = talia.pop(index)
 
     if aktualny_gracz == 1:
         reka_gracza_1.append(karta)
     else:
         reka_gracza_2.append(karta)
 
-    karta_dobrana = True  # Flaga oznaczająca, że karta została dobrana
+    karta_dobrana = True
     return jsonify({
         "dobrana_karta": karta,
         "talia_pozostalo": len(talia)
     })
+
 
 
 @app.route("/discard_card", methods=["POST"])
@@ -61,25 +68,27 @@ def discard_card():
     global reka_gracza_1, reka_gracza_2, stos, aktualny_gracz, karta_dobrana
 
     dane = request.json
-    karta = dane.get("karta")
+    karta_index = dane.get("karta_index")  # Otrzymujemy indeks wyrzucanej karty
 
     if not karta_dobrana:
         return jsonify({"error": "Najpierw musisz dobrać kartę!"}), 400
 
-    if aktualny_gracz == 1 and karta in reka_gracza_1:
-        reka_gracza_1.remove(karta)
-    elif aktualny_gracz == 2 and karta in reka_gracza_2:
-        reka_gracza_2.remove(karta)
+    if aktualny_gracz == 1 and karta_index < len(reka_gracza_1):
+        wyrzucana_karta = reka_gracza_1.pop(karta_index)
+    elif aktualny_gracz == 2 and karta_index < len(reka_gracza_2):
+        wyrzucana_karta = reka_gracza_2.pop(karta_index)
     else:
         return jsonify({"error": "Nieprawidłowa karta!"}), 400
 
-    stos.append(karta)  # Wyrzucamy kartę na stos
-    karta_dobrana = False  # Reset flagi po zakończeniu tury
-    aktualny_gracz = 2 if aktualny_gracz == 1 else 1  # Zmiana kolejki
+    stos.append(wyrzucana_karta)  # Dodajemy kartę na stos
+    karta_dobrana = False
+    aktualny_gracz = 2 if aktualny_gracz == 1 else 1
 
     return jsonify({
-        "stos": stos[-1],  # Wierzchnia karta stosu
-        "aktualny_gracz": aktualny_gracz
+        "stos": stos[-1],  # Ostatnia karta na stosie
+        "aktualny_gracz": aktualny_gracz,
+        "punkty_gracza_1": sum(punktacja_karty(karta) for karta in reka_gracza_1),
+        "punkty_gracza_2": sum(punktacja_karty(karta) for karta in reka_gracza_2)
     })
 
 

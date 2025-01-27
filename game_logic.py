@@ -12,15 +12,30 @@ def stworz_talie():
 
     # Tworzymy talię z dwóch zestawów
     pelna_talia = talia * 2 + jokery * 2
-    random.shuffle(pelna_talia)
+    random.shuffle(pelna_talia)  # Dokładne tasowanie talii
     return pelna_talia
 
 
 def rozdaj_karty(talia, liczba_kart=14):
     """
-    Rozdaje karty graczowi i komputerowi, pozostawia resztę jako stos.
+    Rozdaje karty graczowi i drugiemu graczowi, pozostawia resztę jako stos.
     """
-    reka_gracza = talia[:liczba_kart]
-    reka_komputera = talia[liczba_kart:liczba_kart * 2]
+    reka_gracza_1 = talia[:liczba_kart]
+    reka_gracza_2 = talia[liczba_kart:liczba_kart * 2]
     pozostale_karty = talia[liczba_kart * 2:]
-    return reka_gracza, reka_komputera, pozostale_karty
+    return reka_gracza_1, reka_gracza_2, pozostale_karty
+
+
+def punktacja_karty(karta):
+    """
+    Zwraca wartość punktową dla danej karty.
+    """
+    wartosc = karta.split()[0]
+
+    if wartosc.isdigit():  # Jeśli to liczba (2–10)
+        return int(wartosc)
+    elif wartosc in ["J", "Q", "K"]:
+        return 10
+    elif wartosc in ["A", "Joker"]:
+        return 0
+    return 0
