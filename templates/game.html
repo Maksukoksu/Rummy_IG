@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <title>Remik – Gra wieloosobowa</title>
+  <style>
+    .card {
+      display: inline-block;
+      margin: 5px;
+      padding: 8px 8px 8px 28px;
+      background-color: #f4f4f4;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      position: relative;
+    }
+    .card.current-player {
+      cursor: grab;
+    }
+    .card input[type="checkbox"] {
+      position: absolute;
+      top: 5px;
+      left: 5px;
+      z-index: 10;
+    }
+    .card.dragging {
+      opacity: 0.5;
+    }
+    .group {
+      border: 1px dashed #333;
+      padding: 8px;
+      margin: 8px;
+      display: inline-block;
+      vertical-align: top;
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <h1>Remik – gra wieloosobowa</h1>
+
+  <div id="playersContainer"></div>
+
+  <div id="playerActions" style="display: none;">
+    <h2>Akcje gracza</h2>
+    <p>Aktualny gracz: <span id="currentPlayerName"></span></p>
+
+    <button id="drawCardButton" onclick="drawCard()">Dobierz kartę</button>
+    <button id="layDownButton" onclick="layDownSelected()" disabled>Wyłóż zaznaczone</button>
+    <button id="discardCardButton" onclick="discardSelected()" disabled>Wyrzuć zaznaczoną</button>
+
+    <h3>Dołóż karty do istniejącej grupy</h3>
+    <label>Wybierz grupę:
+      <select id="tableGroupSelect"></select>
+    </label>
+    <button onclick="addCardsToTable()">Dołóż zaznaczone</button>
+  </div>
+
+  <h3>Stos kart wyrzuconych</h3>
+  <p>Ostatnia karta: <span id="lastDiscardedCard">Brak</span></p>
+
+  <h3>Karty na stole</h3>
+  <div id="cardsOnTable"></div>
+
+  <p id="errorMessage" style="color:red;"></p>
+
+  <script>
+    let gameId = null;
+    let numPlayers = 2;
+    let playersHands = []; // np. [ [kartyGracza1], [kartyGracza2], ... ]
+    let currentPlayerIndex = 0;
+    let cardsOnTable = [];
+    let lastDiscardedCard = null;
+
+    window.onload = () => {
+      // pobieramy ?game_id=...
+      const params = new URLSearchParams(window.location.search);
+      gameId = params.get("game_id");
+      if(!gameId){
+        showError("Brak game_id w URL!");
+        return;
+      }
+      loadGameState();
+    };
+
+    function loadGameState(){
+      fetch(`/get_game_state?game_id=${gameId}`)
+       .then(r => r.json())
+       .then(data => {
+         if(data.error){
+           showError(data.error);
+           return;
+         }
+         // Oczekujemy, że data ma:
+         // data.numPlayers, data.playersHands, data.currentPlayerIndex, data.cardsOnTable, data.lastDiscarded
+         numPlayers = data.numPlayers;
+         playersHands = data.playersHands;
+         currentPlayerIndex = data.currentPlayerIndex;
+         cardsOnTable = data.cardsOnTable || [];
+         lastDiscardedCard = data.lastDiscarded || null;
+
+         renderPlayers();
+         renderCardsOnTable(cardsOnTable);
+         document.getElementById("lastDiscardedCard").textContent = lastDiscardedCard ? lastDiscardedCard.name : "Brak";
+         document.getElementById("playerActions").style.display = "block";
+         updateUI();
+       })
+       .catch(err=>{
+         showError("Błąd pobierania stanu gry! "+ err);
+       });
+    }
+
+    function renderPlayers(){
+      const container = document.getElementById("playersContainer");
+      container.innerHTML = "";
+      for(let i=0; i<numPlayers; i++){
+        const h2 = document.createElement("h2");
+        h2.textContent = `Gracz ${i+1}` + (i===currentPlayerIndex ? " (AKTYWNY)" : "");
+        container.appendChild(h2);
+
+        const divCards = document.createElement("div");
+        divCards.id = `playerCards${i}`;
+        divCards.innerHTML = renderHand(playersHands[i], i);
+        container.appendChild(divCards);
+      }
+    }
+
+    function renderHand(hand, pIndex){
+      return hand.map((cardObj, cIndex)=>{
+        if(pIndex===currentPlayerIndex){
+          return `
+            <div class="card current-player"
+                 draggable="true"
+                 ondragstart="onDragStart(event, ${pIndex}, ${cIndex})"
+                 ondragover="onDragOver(event)"
+                 ondrop="onDrop(event, ${pIndex}, ${cIndex})">
+              <input type="checkbox" data-player="${pIndex}" data-card-id="${cardObj.id}"/>
+              ${cardObj.name}
+            </div>
+          `;
+        } else {
+          return `<div class="card">${cardObj.name}</div>`;
+        }
+      }).join("");
+    }
+
+    function renderCardsOnTable(tableData){
+      const container = document.getElementById("cardsOnTable");
+      container.innerHTML = "";
+      tableData.forEach((group, gIndex)=>{
+        let gHtml = group.map(c=> `<div class="card">${c.name}</div>`).join("");
+        container.innerHTML += `
+          <div class="group">
+            <strong>Grupa ${gIndex}:</strong><br/>
+            ${gHtml}
+          </div>
+        `;
+      });
+      updateTableGroupSelect();
+    }
+
+    function updateTableGroupSelect(){
+      const sel = document.getElementById("tableGroupSelect");
+      sel.innerHTML = "";
+      cardsOnTable.forEach((grp, idx)=>{
+        const opt = document.createElement("option");
+        opt.value = idx;
+        opt.textContent = `Grupa ${idx} (size: ${grp.length})`;
+        sel.appendChild(opt);
+      });
+    }
+
+    function updateUI(){
+      document.getElementById("currentPlayerName").textContent = `Gracz ${currentPlayerIndex+1}`;
+      enableDrawCard();
+    }
+
+    // Drag & Drop
+    function onDragStart(e, pIndex, cardIndex){
+      if(e.target.type === "checkbox"){
+        e.preventDefault();
+        return;
+      }
+      e.dataTransfer.setData("pIndex", pIndex);
+      e.dataTransfer.setData("cardIndex", cardIndex);
+      e.target.classList.add("dragging");
+    }
+
+    function onDragOver(e){
+      e.preventDefault();
+    }
+
+    function onDrop(e, pIndex, dropIndex){
+      e.preventDefault();
+      const spIndex = parseInt(e.dataTransfer.getData("pIndex"),10);
+      const cIndex = parseInt(e.dataTransfer.getData("cardIndex"),10);
+      const draggedEl = document.querySelector(".card.dragging");
+      if(draggedEl) draggedEl.classList.remove("dragging");
+
+      if(spIndex!==pIndex) return;
+
+      const hand = playersHands[pIndex];
+      const [moved] = hand.splice(cIndex,1);
+      hand.splice(dropIndex,0,moved);
+      renderPlayers();
+      uncheckAll();
+    }
+
+    // Akcje
+    function enableDrawCard(){
+      document.getElementById("drawCardButton").disabled = false;
+      document.getElementById("layDownButton").disabled = true;
+      document.getElementById("discardCardButton").disabled = true;
+    }
+
+    function enableLayDownAndDiscard(){
+      document.getElementById("drawCardButton").disabled = true;
+      document.getElementById("layDownButton").disabled = false;
+      document.getElementById("discardCardButton").disabled = false;
+    }
+
+    function drawCard(){
+      fetch(`/draw_card?game_id=${gameId}&playerIndex=${currentPlayerIndex}`, {
+        method:"POST"
+      })
+      .then(r=>r.json())
+      .then(data=>{
+        if(data.error){
+          showError(data.error);
+          return;
+        }
+        // data.dobrana_karta
+        playersHands[currentPlayerIndex].push(data.dobrana_karta);
+        renderPlayers();
+        clearError();
+        enableLayDownAndDiscard();
+      })
+      .catch(err=> showError("Błąd drawCard: "+err));
+    }
+
+    function layDownSelected(){
+      const ids = getSelectedCardIDs(currentPlayerIndex);
+      if(ids.length<3){
+        showError("Musisz zaznaczyć co najmniej 3 karty!");
+        return;
+      }
+      fetch(`/lay_down_selected?game_id=${gameId}`, {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          playerIndex: currentPlayerIndex,
+          cards_ids: ids
+        })
+      })
+      .then(r=>r.json())
+      .then(data=>{
+        if(data.error){
+          showError(data.error);
+          return;
+        }
+        playersHands[currentPlayerIndex] = data.newHand;
+        cardsOnTable = data.cardsOnTable;
+        renderPlayers();
+        renderCardsOnTable(cardsOnTable);
+        uncheckAll();
+        clearError();
+        enableLayDownAndDiscard();
+      })
+      .catch(err=> showError(err));
+    }
+
+    function discardSelected(){
+      const ids = getSelectedCardIDs(currentPlayerIndex);
+      if(ids.length===0){
+        showError("Zaznacz 1 kartę do wyrzucenia!");
+        return;
+      }
+      if(ids.length>1){
+        showError("Możesz wyrzucić tylko 1 kartę!");
+        return;
+      }
+      const cid = ids[0];
+      fetch(`/discard_card?game_id=${gameId}`, {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          playerIndex: currentPlayerIndex,
+          card_id: cid
+        })
+      })
+      .then(r=>r.json())
+      .then(data=>{
+        if(data.error){
+          showError(data.error);
+          return;
+        }
+        if(data.game_over){
+          alert(data.info + "\nPunkty przegranego: "+data.punkty_przegranego);
+          return;
+        }
+        playersHands[currentPlayerIndex] = data.newHand;
+        currentPlayerIndex = data.nextPlayerIndex;
+        if(data.lastDiscardedCard) {
+          document.getElementById("lastDiscardedCard").textContent = data.lastDiscardedCard.name;
+        }
+        renderPlayers();
+        uncheckAll();
+        clearError();
+        enableDrawCard();
+      })
+      .catch(err=> showError(err));
+    }
+
+    function addCardsToTable(){
+      const groupIndex = parseInt(document.getElementById("tableGroupSelect").value,10);
+      const ids = getSelectedCardIDs(currentPlayerIndex);
+      if(!ids.length){
+        showError("Zaznacz co najmniej jedną kartę do dołożenia!");
+        return;
+      }
+      fetch(`/add_to_table?game_id=${gameId}`, {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          playerIndex: currentPlayerIndex,
+          group_index: groupIndex,
+          cards_ids: ids
+        })
+      })
+      .then(r=>r.json())
+      .then(data=>{
+        if(data.error){
+          showError(data.error);
+          return;
+        }
+        playersHands[currentPlayerIndex] = data.new_hand;
+        cardsOnTable = data.cards_on_table;
+        renderPlayers();
+        renderCardsOnTable(cardsOnTable);
+        uncheckAll();
+        clearError();
+      })
+      .catch(err=> showError(err));
+    }
+
+    function getSelectedCardIDs(pIndex){
+      const boxes = document.querySelectorAll(`input[type="checkbox"][data-player="${pIndex}"]:checked`);
+      const ids=[];
+      boxes.forEach(b=>ids.push(parseInt(b.getAttribute("data-card-id"),10)));
+      return ids;
+    }
+    function uncheckAll(){
+      document.querySelectorAll('input[type="checkbox"]').forEach(ch=>ch.checked=false);
+    }
+    function showError(msg){
+      document.getElementById("errorMessage").textContent = msg;
+    }
+    function clearError(){
+      showError("");
+    }
+  </script>
+</body>
+</html>
