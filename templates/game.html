@@ -581,8 +581,18 @@ function discardSelected() {
       return;
     }
     if(data.game_over){
-      alert(data.info + "\nPunkty przegranego: "+data.punkty_przegranego);
-      return;
+      if(data.game_over){
+  const wantAgain = confirm(data.info + "\nPunkty przegranego: "
+                            + data.punkty_przegranego
+                            + "\nChcesz rozdać ponownie?");
+  if(wantAgain){
+    // prosty reload / ponowny start
+    window.location.href = "/";
+    // albo fetch("/start_game") – zależnie od Twojej logiki
+  }
+  return;
+}
+
     }
     // aktualizacja stanu
     playersHands[currentPlayerIndex] = data.newHand;

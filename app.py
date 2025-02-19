@@ -193,7 +193,8 @@ def end_game(wIndex):
     return jsonify({
         "info": f"Gracz {wIndex+1} wyrzucił ostatnią kartę i wygrywa!",
         "punkty_przegranego": total_penalty,
-        "game_over": True
+        "game_over": True,
+        "winnerIndex": wIndex
     })
 
 # -------------------------
