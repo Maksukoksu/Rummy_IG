@@ -4,26 +4,39 @@
   <meta charset="UTF-8" />
   <title>Remik – Gra wieloosobowa</title>
   <style>
-    .card {
-      display: inline-block;
-      margin: 5px;
-      padding: 8px 8px 8px 28px;
-      background-color: #f4f4f4;
-      border: 1px solid #ddd;
-      border-radius: 5px;
+    /* Główne tło (zielone), brązowe obramowanie – stół do kart */
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #008000; /* zielony stół */
+      border: 10px solid #8B4513; /* brązowa ramka */
+      box-sizing: border-box;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Sekcja główna: stół + lewy/prawy stos */
+    #tableArea {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
       position: relative;
+      overflow: auto;
     }
-    .card.current-player {
-      cursor: grab;
-    }
-    .card input[type="checkbox"] {
-      position: absolute;
-      top: 5px;
-      left: 5px;
-      z-index: 10;
-    }
-    .card.dragging {
-      opacity: 0.5;
+
+    /* Wyłożone karty (na środku) */
+    #cardsOnTable {
+      background-color: rgba(255,255,255,0.2);
+      padding: 10px;
+      border-radius: 8px;
+        width: 1400px;
+        min-height: 400px;
+        margin: 0 auto;
+          overflow: auto;          /* w razie gdy kart będzie dużo, pojawi się scrollbar */
+  box-sizing: border-box
+
     }
     .group {
       border: 1px dashed #333;
@@ -31,54 +44,174 @@
       margin: 8px;
       display: inline-block;
       vertical-align: top;
+      background-color: #f4f4f4;
     }
+
+    /* Stos dobierania (lewa strona), wyrzucania (prawa strona) */
+    .pile {
+      width: 80px;
+      height: 110px;
+      border: 1px solid #ddd;
+        border-radius: 5px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: #f4f4f4;
+      font-weight: bold;
+    }
+    #leftSide, #rightSide {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    #leftSide {
+      left: 20px;
+    }
+    #rightSide {
+      right: 20px;
+      text-align: center;
+    }
+
+    /* Ostatnia wyrzucona karta – info nad stos */
+    #lastDiscardedLabel {
+      margin-bottom: 5px;
+      font-weight: bold;
+      color: #fff;
+      text-shadow: 1px 1px 2px #000;
+    }
+    /* Tylko do stylu, w razie co */
+    #lastDiscardedCard {
+      display: block;
+      color: #fff;
+      text-shadow: 1px 1px 2px #000;
+    }
+
+    /* Dolna sekcja – przyciski i karty gracza */
+    #bottomArea {
+      background-color: rgba(0,0,0,0.2);
+      padding: 10px;
+    }
+    #playerActions {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    /* Karty gracza (hotseat) */
+    #playersContainer {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+.card {
+  width: 80px;
+  height: 120px;
+  display: inline-block;
+  margin: 5px;
+  background-color: #f4f4f4;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  position: relative; /* pozwala na absolute wewnątrz */
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* Checkbox – aby był na wierzchu i klikalny */
+.card input[type="checkbox"] {
+  position: absolute;
+  top: 5px;  /* minimalny margines, by nie zasłaniało wartości */
+  left: 5px;
+  z-index: 999; /* wysoki z-index, żeby nie zniknął pod tłem */
+  width: 20px;
+  height: 20px;
+}
+
+
+    .card.current-player {
+      cursor: grab;
+    }
+    .card.dragging {
+      opacity: 0.5;
+    }
+
     button:disabled {
       opacity: 0.6;
       cursor: not-allowed;
     }
+
+    #errorMessage {
+      color: red;
+      text-align: center;
+      margin: 5px;
+    }
+    #discardPile {
+  background-size: contain;      /* żeby wypełniało obszar */
+  background-position: center;
+  background-repeat: no-repeat;
+}
   </style>
 </head>
 <body>
-  <h1>Remik – gra wieloosobowa</h1>
+  <!-- Obszar główny stołu -->
+  <div id="tableArea">
+    <!-- Lewa strona – stos dobierania -->
+    <div id="leftSide">
+ <div class="pile" id="drawPile"
+       style="background-image: url('/static/cards/Cards-Back.svg');
+              background-size: contain;
+              background-position: center;
+              background-repeat: no-repeat;">
+      </div>
+    </div>
 
-  <div id="playersContainer"></div>
+    <!-- Środkowe miejsce na karty wyłożone -->
+    <div id="cardsOnTable"></div>
 
-  <div id="playerActions" style="display: none;">
-    <h2>Akcje gracza</h2>
-    <p>Aktualny gracz: <span id="currentPlayerName"></span></p>
-
-    <button id="drawCardButton" onclick="drawCard()">Dobierz kartę</button>
-    <button id="layDownButton" onclick="layDownSelected()" disabled>Wyłóż zaznaczone</button>
-    <button id="discardCardButton" onclick="discardSelected()" disabled>Wyrzuć zaznaczoną</button>
-
-    <h3>Dołóż karty do istniejącej grupy</h3>
-    <label>Wybierz grupę:
-      <select id="tableGroupSelect"></select>
-    </label>
-    <button onclick="addCardsToTable()">Dołóż zaznaczone</button>
+    <!-- Prawa strona – stos wyrzucania i info o ostatniej karcie wyrzuconej -->
+    <div id="rightSide">
+      <div id="lastDiscardedLabel"></div>
+      <span id="lastDiscardedCard"></span>
+      <br/>
+      <div class="pile" id="discardPile"></div>
+    </div>
   </div>
 
-  <h3>Stos kart wyrzuconych</h3>
-  <p>Ostatnia karta: <span id="lastDiscardedCard">Brak</span></p>
+  <!-- Dolna sekcja – przyciski + karty gracza -->
+  <div id="bottomArea">
+    <!-- Usunięto nagłówek "Akcje gracza" -->
+    <div id="playerActions" style="display:none;">
+      <p>Aktualny gracz: <span id="currentPlayerName"></span></p>
+      <button id="drawCardButton" onclick="drawCard()">Dobierz kartę</button>
+      <button id="layDownButton" onclick="layDownSelected()" disabled>Wyłóż zaznaczone</button>
+      <button id="discardCardButton" onclick="discardSelected()" disabled>Wyrzuć zaznaczoną</button>
 
-  <h3>Karty na stole</h3>
-  <div id="cardsOnTable"></div>
+      <br/><br/>
+      <label>Wybierz grupę:
+        <select id="tableGroupSelect"></select>
+      </label>
+      <button onclick="addCardsToTable()">Dołóż zaznaczone</button>
+    </div>
 
-  <p id="errorMessage" style="color:red;"></p>
+    <div id="playersContainer">
+      <!-- Karty gracza – generowane dynamicznie -->
+    </div>
+
+    <p id="errorMessage"></p>
+  </div>
 
   <script>
+    /* -----------------------
+       LOGIKA JS (podobna do poprzedniej)
+       ----------------------- */
     let gameId = null;
     let numPlayers = 2;
-    let playersHands = []; // np. [ [kartyGracza1], [kartyGracza2], ... ]
+    let playersHands = [];
     let currentPlayerIndex = 0;
     let cardsOnTable = [];
     let lastDiscardedCard = null;
-
-    // Dodatkowa zmienna do detekcji zmiany tury:
     let previousPlayerIndex = -1;
 
     window.onload = () => {
-      // pobieramy ?game_id=...
       const params = new URLSearchParams(window.location.search);
       gameId = params.get("game_id");
       if(!gameId){
@@ -96,7 +229,6 @@
            showError(data.error);
            return;
          }
-         // Oczekujemy: data.numPlayers, data.playersHands, data.currentPlayerIndex, data.cardsOnTable, data.lastDiscarded
          numPlayers = data.numPlayers;
          playersHands = data.playersHands;
          currentPlayerIndex = data.currentPlayerIndex;
@@ -122,13 +254,11 @@
       for(let i=0; i<numPlayers; i++){
         const div = document.createElement("div");
         if(i === currentPlayerIndex){
-          // Pokazujemy karty aktywnego gracza
           div.innerHTML = `
             <h2>Gracz ${i+1} (AKTYWNY)</h2>
             ${ renderHand(playersHands[i], i) }
           `;
         } else {
-          // Ukrywamy karty – hotseat
           div.innerHTML = `
             <h2>Gracz ${i+1}</h2>
             <p style="color:gray;">(Ukryte – czekaj na swoją turę)</p>
@@ -140,7 +270,6 @@
 
     function renderHand(hand, pIndex){
       return hand.map((cardObj, cIndex) => {
-        // Tylko widać karty aktualnego gracza
         return `
           <div class="card current-player"
                draggable="true"
@@ -154,20 +283,35 @@
       }).join("");
     }
 
-    function renderCardsOnTable(tableData){
-      const container = document.getElementById("cardsOnTable");
-      container.innerHTML = "";
-      tableData.forEach((group, gIndex)=>{
-        let gHtml = group.map(c=> `<div class="card">${c.name}</div>`).join("");
-        container.innerHTML += `
-          <div class="group">
-            <strong>Grupa ${gIndex}:</strong><br/>
-            ${gHtml}
-          </div>
-        `;
-      });
-      updateTableGroupSelect();
-    }
+function renderCardsOnTable(tableData) {
+  const container = document.getElementById("cardsOnTable");
+  container.innerHTML = "";
+
+  tableData.forEach((group, gIndex) => {
+    // Dla każdej grupy mapujemy karty na DIV-y z tłem
+    let gHtml = group.map(cardObj => {
+      const cardFile = getCardFilename(cardObj.name);
+      return `
+        <div class="card"
+             style="
+               background-image: url('/static/cards/${cardFile}');
+               background-size: contain;
+               background-position: center;
+               background-repeat: no-repeat;
+             ">
+        </div>
+      `;
+    }).join("");
+
+    container.innerHTML += `
+      <div class="group">
+        <strong>Grupa ${gIndex}:</strong><br/>
+        ${gHtml}
+      </div>
+    `;
+  });
+  updateTableGroupSelect();
+}
 
     function updateTableGroupSelect(){
       const sel = document.getElementById("tableGroupSelect");
@@ -181,7 +325,6 @@
     }
 
     function updateUI(){
-      // Jeżeli zmienił się aktualny gracz => alert
       if(previousPlayerIndex !== currentPlayerIndex){
         alert(`Tura Gracza ${currentPlayerIndex+1}`);
         previousPlayerIndex = currentPlayerIndex;
@@ -205,42 +348,37 @@
       e.preventDefault();
     }
 
-    function onDrop(e, pIndex, dropIndex) {
-  e.preventDefault();
-  const spIndex = parseInt(e.dataTransfer.getData("pIndex"), 10);
-  const cIndex = parseInt(e.dataTransfer.getData("cardIndex"), 10);
-  const draggedEl = document.querySelector(".card.dragging");
-  if (draggedEl) draggedEl.classList.remove("dragging");
+    function onDrop(e, pIndex, dropIndex){
+      e.preventDefault();
+      const spIndex = parseInt(e.dataTransfer.getData("pIndex"),10);
+      const cIndex = parseInt(e.dataTransfer.getData("cardIndex"),10);
+      const draggedEl = document.querySelector(".card.dragging");
+      if(draggedEl) draggedEl.classList.remove("dragging");
 
-  if (spIndex !== pIndex) return;
+      if(spIndex!==pIndex) return;
 
-  // Przenosimy w tablicy gracza
-  const hand = playersHands[pIndex];
-  const [moved] = hand.splice(cIndex, 1);
-  hand.splice(dropIndex, 0, moved);
+      const hand = playersHands[pIndex];
+      const [moved] = hand.splice(cIndex,1);
+      hand.splice(dropIndex,0,moved);
+      renderPlayers();
+      uncheckAll();
 
-  // Odświeżamy UI lokalnie
-  renderPlayers();
-  uncheckAll();
-
-  // *** Wyślij do serwera nową kolejność (listę ID) ***
-  const newOrderIds = hand.map(c => c.id); // np. [123, 55, 77, ...]
-  fetch(`/update_hand_order?game_id=${gameId}&playerIndex=${pIndex}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ new_order_ids: newOrderIds })
-  })
-  .then(r => r.json())
-  .then(data => {
-    if (data.error) {
-      showError(data.error);
-      return;
+      // Wyślij do serwera nową kolejność
+      const newOrderIds = hand.map(c => c.id);
+      fetch(`/update_hand_order?game_id=${gameId}&playerIndex=${pIndex}`, {
+        method: "POST",
+        headers: { "Content-Type":"application/json" },
+        body: JSON.stringify({ new_order_ids: newOrderIds })
+      })
+      .then(r=>r.json())
+      .then(data=>{
+        if(data.error){
+          showError(data.error);
+          return;
+        }
+      })
+      .catch(err => showError("Błąd update_hand_order: " + err));
     }
-    // ewentualnie: "ręka zaktualizowana"
-  })
-  .catch(err => showError("Błąd update_hand_order: " + err));
-}
-
 
     // Akcje
     function enableDrawCard(){
@@ -342,54 +480,45 @@
         uncheckAll();
         clearError();
         enableDrawCard();
-        // Po zmianie gracza => updateUI() => alert("Tura Gracza X")
         updateUI();
       })
       .catch(err=> showError(err));
     }
 
-   function addCardsToTable(){
-  console.log("Clicked addCardsToTable");
-  const groupIndex = parseInt(document.getElementById("tableGroupSelect").value, 10);
-  const ids = getSelectedCardIDs(currentPlayerIndex);
-  console.log("groupIndex=", groupIndex, " selectedIds=", ids);
+    function addCardsToTable(){
+      const groupIndex = parseInt(document.getElementById("tableGroupSelect").value, 10);
+      const ids = getSelectedCardIDs(currentPlayerIndex);
 
-  if(!ids.length){
-    showError("Nie zaznaczyłeś żadnych kart do dołożenia!");
-    return;
-  }
-  fetch(`/add_to_table?game_id=${gameId}`, {
-    method:"POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({
-      playerIndex: currentPlayerIndex,
-      group_index: groupIndex,
-      cards_ids: ids
-    })
-  })
-  .then(r => {
-    console.log("HTTP status=", r.status);
-    return r.json();
-  })
-  .then(data => {
-    console.log("add_to_table response=", data);
-    if(data.error){
-      showError(data.error);
-      return;
+      if(!ids.length){
+        showError("Nie zaznaczyłeś żadnych kart do dołożenia!");
+        return;
+      }
+      fetch(`/add_to_table?game_id=${gameId}`, {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          playerIndex: currentPlayerIndex,
+          group_index: groupIndex,
+          cards_ids: ids
+        })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if(data.error){
+          showError(data.error);
+          return;
+        }
+        playersHands[currentPlayerIndex] = data.new_hand;
+        cardsOnTable = data.cards_on_table;
+        renderPlayers();
+        renderCardsOnTable(cardsOnTable);
+        uncheckAll();
+        clearError();
+      })
+      .catch(err => {
+        showError("Błąd: " + err);
+      });
     }
-    // success
-    playersHands[currentPlayerIndex] = data.new_hand;
-    cardsOnTable = data.cards_on_table;
-    renderPlayers();
-    renderCardsOnTable(cardsOnTable);
-    uncheckAll();
-    clearError();
-  })
-  .catch(err => {
-    console.error("add_to_table catch error=", err);
-    showError("Błąd: " + err);
-  });
-}
 
     function getSelectedCardIDs(pIndex){
       const boxes = document.querySelectorAll(`input[type="checkbox"][data-player="${pIndex}"]:checked`);
@@ -406,6 +535,99 @@
     function clearError(){
       showError("");
     }
+      // 1. Mapowanie suits i rank => nazwa pliku
+  function mapPolishSuitToEnglish(polishSuit) {
+    switch(polishSuit.toLowerCase()) {
+      case "kier": return "Heart";
+      case "karo": return "Diamond";
+      case "pik":  return "Spade";
+      case "trefl":return "Club";
+      default: return polishSuit;
+    }
+  }
+
+  function getCardFilename(cardName) {
+    // Joker?
+    if (cardName.toLowerCase().includes("joker")) {
+      return "Cards-Joker.svg";
+    }
+    let [rank, suit] = cardName.split(" ");
+    suit = mapPolishSuitToEnglish(suit);
+    return `Cards-${rank}-${suit}.svg`;
+  }
+function discardSelected() {
+  const ids = getSelectedCardIDs(currentPlayerIndex);
+  if(ids.length===0) {
+    showError("Zaznacz 1 kartę do wyrzucenia!");
+    return;
+  }
+  if(ids.length>1){
+    showError("Możesz wyrzucić tylko 1 kartę!");
+    return;
+  }
+  const cid = ids[0];
+  fetch(`/discard_card?game_id=${gameId}`, {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({
+      playerIndex: currentPlayerIndex,
+      card_id: cid
+    })
+  })
+  .then(r=>r.json())
+  .then(data=>{
+    if(data.error){
+      showError(data.error);
+      return;
+    }
+    if(data.game_over){
+      alert(data.info + "\nPunkty przegranego: "+data.punkty_przegranego);
+      return;
+    }
+    // aktualizacja stanu
+    playersHands[currentPlayerIndex] = data.newHand;
+    currentPlayerIndex = data.nextPlayerIndex;
+
+    // *** kluczowa część: data.lastDiscardedCard zawiera np. { name: "5 Diamond", id: X }
+    if(data.lastDiscardedCard){
+      // generujemy nazwę pliku np. "Cards-5-Diamond.svg"
+      const filename = getCardFilename(data.lastDiscardedCard.name);
+      // set background
+      const discardPileDiv = document.getElementById("discardPile");
+      discardPileDiv.style.backgroundImage = `url('/static/cards/${filename}')`;
+    }
+
+    renderPlayers();
+    uncheckAll();
+    clearError();
+    enableDrawCard();
+    updateUI();
+  })
+  .catch(err => showError(err));
+}
+  function renderHand(hand, pIndex){
+    return hand.map((cardObj, cIndex) => {
+      const cardFilename = getCardFilename(cardObj.name);
+      return `
+        <div class="card current-player"
+             style="
+               background-image: url('/static/cards/${cardFilename}');
+               background-size: cover;
+               background-position: center;"
+             draggable="true"
+             ondragstart="onDragStart(event, ${pIndex}, ${cIndex})"
+             ondragover="onDragOver(event)"
+             ondrop="onDrop(event, ${pIndex}, ${cIndex})"
+        >
+          <input type="checkbox"
+                 data-player="${pIndex}"
+                 data-card-id="${cardObj.id}"
+                 style="position:absolute; top:30px; left:12px;"
+          />
+        </div>
+      `;
+    }).join("");
+  }
   </script>
 </body>
 </html>
