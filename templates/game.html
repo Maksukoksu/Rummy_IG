@@ -74,6 +74,9 @@
     let cardsOnTable = [];
     let lastDiscardedCard = null;
 
+    // Dodatkowa zmienna do detekcji zmiany tury:
+    let previousPlayerIndex = -1;
+
     window.onload = () => {
       // pobieramy ?game_id=...
       const params = new URLSearchParams(window.location.search);
@@ -93,8 +96,7 @@
            showError(data.error);
            return;
          }
-         // Oczekujemy, że data ma:
-         // data.numPlayers, data.playersHands, data.currentPlayerIndex, data.cardsOnTable, data.lastDiscarded
+         // Oczekujemy: data.numPlayers, data.playersHands, data.currentPlayerIndex, data.cardsOnTable, data.lastDiscarded
          numPlayers = data.numPlayers;
          playersHands = data.playersHands;
          currentPlayerIndex = data.currentPlayerIndex;
@@ -103,12 +105,14 @@
 
          renderPlayers();
          renderCardsOnTable(cardsOnTable);
-         document.getElementById("lastDiscardedCard").textContent = lastDiscardedCard ? lastDiscardedCard.name : "Brak";
+         document.getElementById("lastDiscardedCard").textContent =
+           lastDiscardedCard ? lastDiscardedCard.name : "Brak";
+
          document.getElementById("playerActions").style.display = "block";
          updateUI();
        })
        .catch(err=>{
-         showError("Błąd pobierania stanu gry! "+ err);
+         showError("Błąd pobierania stanu gry! " + err);
        });
     }
 
@@ -116,33 +120,37 @@
       const container = document.getElementById("playersContainer");
       container.innerHTML = "";
       for(let i=0; i<numPlayers; i++){
-        const h2 = document.createElement("h2");
-        h2.textContent = `Gracz ${i+1}` + (i===currentPlayerIndex ? " (AKTYWNY)" : "");
-        container.appendChild(h2);
-
-        const divCards = document.createElement("div");
-        divCards.id = `playerCards${i}`;
-        divCards.innerHTML = renderHand(playersHands[i], i);
-        container.appendChild(divCards);
+        const div = document.createElement("div");
+        if(i === currentPlayerIndex){
+          // Pokazujemy karty aktywnego gracza
+          div.innerHTML = `
+            <h2>Gracz ${i+1} (AKTYWNY)</h2>
+            ${ renderHand(playersHands[i], i) }
+          `;
+        } else {
+          // Ukrywamy karty – hotseat
+          div.innerHTML = `
+            <h2>Gracz ${i+1}</h2>
+            <p style="color:gray;">(Ukryte – czekaj na swoją turę)</p>
+          `;
+        }
+        container.appendChild(div);
       }
     }
 
     function renderHand(hand, pIndex){
-      return hand.map((cardObj, cIndex)=>{
-        if(pIndex===currentPlayerIndex){
-          return `
-            <div class="card current-player"
-                 draggable="true"
-                 ondragstart="onDragStart(event, ${pIndex}, ${cIndex})"
-                 ondragover="onDragOver(event)"
-                 ondrop="onDrop(event, ${pIndex}, ${cIndex})">
-              <input type="checkbox" data-player="${pIndex}" data-card-id="${cardObj.id}"/>
-              ${cardObj.name}
-            </div>
-          `;
-        } else {
-          return `<div class="card">${cardObj.name}</div>`;
-        }
+      return hand.map((cardObj, cIndex) => {
+        // Tylko widać karty aktualnego gracza
+        return `
+          <div class="card current-player"
+               draggable="true"
+               ondragstart="onDragStart(event, ${pIndex}, ${cIndex})"
+               ondragover="onDragOver(event)"
+               ondrop="onDrop(event, ${pIndex}, ${cIndex})">
+            <input type="checkbox" data-player="${pIndex}" data-card-id="${cardObj.id}"/>
+            ${cardObj.name}
+          </div>
+        `;
       }).join("");
     }
 
@@ -173,6 +181,11 @@
     }
 
     function updateUI(){
+      // Jeżeli zmienił się aktualny gracz => alert
+      if(previousPlayerIndex !== currentPlayerIndex){
+        alert(`Tura Gracza ${currentPlayerIndex+1}`);
+        previousPlayerIndex = currentPlayerIndex;
+      }
       document.getElementById("currentPlayerName").textContent = `Gracz ${currentPlayerIndex+1}`;
       enableDrawCard();
     }
@@ -192,21 +205,42 @@
       e.preventDefault();
     }
 
-    function onDrop(e, pIndex, dropIndex){
-      e.preventDefault();
-      const spIndex = parseInt(e.dataTransfer.getData("pIndex"),10);
-      const cIndex = parseInt(e.dataTransfer.getData("cardIndex"),10);
-      const draggedEl = document.querySelector(".card.dragging");
-      if(draggedEl) draggedEl.classList.remove("dragging");
+    function onDrop(e, pIndex, dropIndex) {
+  e.preventDefault();
+  const spIndex = parseInt(e.dataTransfer.getData("pIndex"), 10);
+  const cIndex = parseInt(e.dataTransfer.getData("cardIndex"), 10);
+  const draggedEl = document.querySelector(".card.dragging");
+  if (draggedEl) draggedEl.classList.remove("dragging");
 
-      if(spIndex!==pIndex) return;
+  if (spIndex !== pIndex) return;
 
-      const hand = playersHands[pIndex];
-      const [moved] = hand.splice(cIndex,1);
-      hand.splice(dropIndex,0,moved);
-      renderPlayers();
-      uncheckAll();
+  // Przenosimy w tablicy gracza
+  const hand = playersHands[pIndex];
+  const [moved] = hand.splice(cIndex, 1);
+  hand.splice(dropIndex, 0, moved);
+
+  // Odświeżamy UI lokalnie
+  renderPlayers();
+  uncheckAll();
+
+  // *** Wyślij do serwera nową kolejność (listę ID) ***
+  const newOrderIds = hand.map(c => c.id); // np. [123, 55, 77, ...]
+  fetch(`/update_hand_order?game_id=${gameId}&playerIndex=${pIndex}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ new_order_ids: newOrderIds })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) {
+      showError(data.error);
+      return;
     }
+    // ewentualnie: "ręka zaktualizowana"
+  })
+  .catch(err => showError("Błąd update_hand_order: " + err));
+}
+
 
     // Akcje
     function enableDrawCard(){
@@ -231,7 +265,6 @@
           showError(data.error);
           return;
         }
-        // data.dobrana_karta
         playersHands[currentPlayerIndex].push(data.dobrana_karta);
         renderPlayers();
         clearError();
@@ -243,7 +276,7 @@
     function layDownSelected(){
       const ids = getSelectedCardIDs(currentPlayerIndex);
       if(ids.length<3){
-        showError("Musisz zaznaczyć co najmniej 3 karty!");
+        showError("Musisz zaznaczyć >=3 karty!");
         return;
       }
       fetch(`/lay_down_selected?game_id=${gameId}`, {
@@ -302,57 +335,70 @@
         }
         playersHands[currentPlayerIndex] = data.newHand;
         currentPlayerIndex = data.nextPlayerIndex;
-        if(data.lastDiscardedCard) {
+        if(data.lastDiscardedCard){
           document.getElementById("lastDiscardedCard").textContent = data.lastDiscardedCard.name;
         }
         renderPlayers();
         uncheckAll();
         clearError();
         enableDrawCard();
+        // Po zmianie gracza => updateUI() => alert("Tura Gracza X")
+        updateUI();
       })
       .catch(err=> showError(err));
     }
 
-    function addCardsToTable(){
-      const groupIndex = parseInt(document.getElementById("tableGroupSelect").value,10);
-      const ids = getSelectedCardIDs(currentPlayerIndex);
-      if(!ids.length){
-        showError("Zaznacz co najmniej jedną kartę do dołożenia!");
-        return;
-      }
-      fetch(`/add_to_table?game_id=${gameId}`, {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({
-          playerIndex: currentPlayerIndex,
-          group_index: groupIndex,
-          cards_ids: ids
-        })
-      })
-      .then(r=>r.json())
-      .then(data=>{
-        if(data.error){
-          showError(data.error);
-          return;
-        }
-        playersHands[currentPlayerIndex] = data.new_hand;
-        cardsOnTable = data.cards_on_table;
-        renderPlayers();
-        renderCardsOnTable(cardsOnTable);
-        uncheckAll();
-        clearError();
-      })
-      .catch(err=> showError(err));
+   function addCardsToTable(){
+  console.log("Clicked addCardsToTable");
+  const groupIndex = parseInt(document.getElementById("tableGroupSelect").value, 10);
+  const ids = getSelectedCardIDs(currentPlayerIndex);
+  console.log("groupIndex=", groupIndex, " selectedIds=", ids);
+
+  if(!ids.length){
+    showError("Nie zaznaczyłeś żadnych kart do dołożenia!");
+    return;
+  }
+  fetch(`/add_to_table?game_id=${gameId}`, {
+    method:"POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      playerIndex: currentPlayerIndex,
+      group_index: groupIndex,
+      cards_ids: ids
+    })
+  })
+  .then(r => {
+    console.log("HTTP status=", r.status);
+    return r.json();
+  })
+  .then(data => {
+    console.log("add_to_table response=", data);
+    if(data.error){
+      showError(data.error);
+      return;
     }
+    // success
+    playersHands[currentPlayerIndex] = data.new_hand;
+    cardsOnTable = data.cards_on_table;
+    renderPlayers();
+    renderCardsOnTable(cardsOnTable);
+    uncheckAll();
+    clearError();
+  })
+  .catch(err => {
+    console.error("add_to_table catch error=", err);
+    showError("Błąd: " + err);
+  });
+}
 
     function getSelectedCardIDs(pIndex){
       const boxes = document.querySelectorAll(`input[type="checkbox"][data-player="${pIndex}"]:checked`);
-      const ids=[];
-      boxes.forEach(b=>ids.push(parseInt(b.getAttribute("data-card-id"),10)));
+      const ids = [];
+      boxes.forEach(b=> ids.push(parseInt(b.getAttribute("data-card-id"),10)));
       return ids;
     }
     function uncheckAll(){
-      document.querySelectorAll('input[type="checkbox"]').forEach(ch=>ch.checked=false);
+      document.querySelectorAll('input[type="checkbox"]').forEach(ch=> ch.checked=false);
     }
     function showError(msg){
       document.getElementById("errorMessage").textContent = msg;
