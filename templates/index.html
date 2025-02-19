@@ -2,33 +2,128 @@
 <html lang="pl">
 <head>
   <meta charset="UTF-8" />
-  <title>Remik – Strona Startowa</title>
+  <title>Remik – Start</title>
   <style>
+    /* Reset podstawowy */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    /* Tło – ciemniejszy zielony */
     body {
+      background: #2E6D3F; /* ciemniejsza zieleń */
+      color: #fff;
       font-family: sans-serif;
-      margin: 20px;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* Kontener centralny */
+    main {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    /* Pojemnik na treść startową (w centrum) */
+    #startContainer {
+      background: rgba(255,255,255,0.1); /* lekka przejrzystość */
+      border: 2px solid #8B4513; /* brązowa ramka */
+      border-radius: 8px;
+      padding: 30px 40px;
+      text-align: center;
+      max-width: 400px;
+      width: 100%;
+    }
+
+    #startContainer h1 {
+      margin-bottom: 15px;
+      font-size: 2.2rem;
+      color: #fff;
+      text-shadow: 1px 1px 2px #000;
+    }
+
+    /* Tekst w sekcji */
+    #startContainer p {
+      margin-bottom: 10px;
+      font-size: 1.1rem;
+    }
+
+    label, select {
+      font-size: 1.1rem;
+      cursor: pointer;
+    }
+
+    /* Select – brązowe tło, jasne litery */
+    select {
+      margin-left: 10px;
+      padding: 5px 10px;
+      border-radius: 4px;
+      border: 2px solid #8B4513;
+      background-color: #8B4513; /* brąz */
+      color: #fff;
+      outline: none;
+    }
+    select:focus {
+      border-color: #a5642a;
+    }
+
+    /* Przycisk – też brązowo-zielony */
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 1rem;
+      border: 2px solid #8B4513;
+      border-radius: 5px;
+      background-color: #8B4513; /* brąz */
+      color: #fff;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #a5642a; /* jaśniejszy brąz */
+    }
+
+    /* Stopka */
+    footer {
+      background-color: rgba(0,0,0,0.2);
+      color: #eee;
+      text-align: center;
+      padding: 10px 0;
+      border-top: 2px solid #8B4513;
     }
   </style>
 </head>
 <body>
-  <h1>Remik – Wybór liczby graczy (2–4)</h1>
 
-  <div>
-    <label>
-      Liczba graczy:
-      <select id="numPlayers">
-        <option value="2" selected>2</option>
-        <option value="3">3</option>
-        <option value="4">4</option>
-      </select>
-    </label>
-  </div>
+  <main>
+    <div id="startContainer">
+      <h1>Remik</h1>
+      <p>Wybierz liczbę graczy (2–4):</p>
+      <label>
+        <select id="numPlayers">
+          <option value="2" selected>2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+        </select>
+      </label>
+      <br/>
+      <button onclick="startGame()">Rozpocznij grę</button>
+    </div>
+  </main>
 
-  <button onclick="startGame()">Rozpocznij grę</button>
+  <footer>
+    <p>Projekt na studia &ndash; Maksymilian Tatomir</p>
+  </footer>
 
   <script>
     function startGame() {
-      const num = parseInt(document.getElementById("numPlayers").value,10);
+      const num = parseInt(document.getElementById("numPlayers").value, 10);
 
       fetch("/setup_game", {
         method: "POST",
@@ -43,13 +138,13 @@
       })
       .then(data => {
         if(data.error){
-          alert("Serwer zgłosił błąd: " + data.error);
+          alert("Błąd serwera: " + data.error);
           return;
         }
         if(data.redirect_url){
           window.location.href = data.redirect_url;
         } else {
-          alert("Otrzymano nieoczekiwaną odpowiedź: " + JSON.stringify(data));
+          alert("Nieoczekiwana odpowiedź: " + JSON.stringify(data));
         }
       })
       .catch(err => {
