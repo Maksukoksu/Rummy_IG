@@ -4,61 +4,73 @@
   <meta charset="UTF-8" />
   <title>Remik – Gra wieloosobowa</title>
   <style>
-    /* Główne tło (zielone), brązowe obramowanie – stół do kart */
-    body {
+    /* Wyzerowanie marginesów, box-sizing */
+    * {
       margin: 0;
       padding: 0;
+      box-sizing: border-box;
+    }
+
+    /* Główne tło (zielone), brązowa ramka – stół do kart */
+    body {
       background-color: #008000; /* zielony stół */
       border: 10px solid #8B4513; /* brązowa ramka */
-      box-sizing: border-box;
       height: 100vh;
       display: flex;
       flex-direction: column;
+      font-family: sans-serif;
+      color: #fff;
     }
 
-    /* Sekcja główna: stół + lewy/prawy stos */
+    /* Górna połowa ekranu – stół i stosy */
     #tableArea {
-      flex: 1;
+      height: 50vh; /* górne 50% okna */
+      position: relative;
       display: flex;
       justify-content: center;
       align-items: center;
-      position: relative;
       overflow: auto;
     }
 
-    /* Wyłożone karty (na środku) */
-    #cardsOnTable {
-      background-color: rgba(255,255,255,0.2);
-      padding: 10px;
-      border-radius: 8px;
-        width: 1400px;
-        min-height: 400px;
-        margin: 0 auto;
-          overflow: auto;          /* w razie gdy kart będzie dużo, pojawi się scrollbar */
-  box-sizing: border-box
+    /* Kontener na wyłożone grupy (wyświetlane poziomo / zawijane) */
+ #cardsOnTable {
+  display: flex;
+  flex-wrap: wrap; /* grupy będą się układały w wielu wierszach */
+  gap: 10px;
 
-    }
+  width: 1000px;
+  height: 350px; /* stała wysokość */
+
+  background-color: rgba(255,255,255,0.2);
+  padding: 10px;
+  border-radius: 8px;
+
+  overflow: auto; /* włączamy paski przewijania (x,y) */
+}
+
+
+    /* Każda grupa kart – też w poziomie */
     .group {
+      display: flex;       /* karty w grupie obok siebie */
+      flex-wrap: nowrap;   /* jeśli chcesz, by karty w grupie się nie zawijały */
+      gap: 5px;
+      background-color: #f4f4f4;
+      color: #000;
       border: 1px dashed #333;
       padding: 8px;
-      margin: 8px;
-      display: inline-block;
-      vertical-align: top;
-      background-color: #f4f4f4;
+      border-radius: 6px;
+      /* ustalamy minimalny rozmiar, by widać było tytuł */
+      min-width: 120px;
+      align-items: center; /* karty wyrównane w pionie */
     }
 
-    /* Stos dobierania (lewa strona), wyrzucania (prawa strona) */
-    .pile {
-      width: 80px;
-      height: 110px;
-      border: 1px solid #ddd;
-        border-radius: 5px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background-color: #f4f4f4;
+    .group-title {
       font-weight: bold;
+      margin-right: 8px;
+      color: #000;
     }
+
+    /* Lewa/prawa stos */
     #leftSide, #rightSide {
       position: absolute;
       top: 50%;
@@ -72,61 +84,107 @@
       text-align: center;
     }
 
-    /* Ostatnia wyrzucona karta – info nad stos */
-    #lastDiscardedLabel {
-      margin-bottom: 5px;
-      font-weight: bold;
-      color: #fff;
-      text-shadow: 1px 1px 2px #000;
-    }
-    /* Tylko do stylu, w razie co */
-    #lastDiscardedCard {
-      display: block;
-      color: #fff;
-      text-shadow: 1px 1px 2px #000;
-    }
-
-    /* Dolna sekcja – przyciski i karty gracza */
-    #bottomArea {
-      background-color: rgba(0,0,0,0.2);
-      padding: 10px;
-    }
-    #playerActions {
-      text-align: center;
-      margin-bottom: 10px;
-    }
-
-    /* Karty gracza (hotseat) */
-    #playersContainer {
+    .pile {
+      width: 80px;
+      height: 110px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      background-color: #f4f4f4;
       display: flex;
       justify-content: center;
-      flex-wrap: wrap;
+      align-items: center;
+      font-weight: bold;
+      background-size: contain;
+      background-position: center;
+      background-repeat: no-repeat;
     }
-.card {
-  width: 80px;
-  height: 120px;
-  display: inline-block;
-  margin: 5px;
-  background-color: #f4f4f4;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  position: relative; /* pozwala na absolute wewnątrz */
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-}
+    #discardPile {
+      /* tu w JS wstawiamy background-image dla wyrzuconej karty */
+    }
 
-/* Checkbox – aby był na wierzchu i klikalny */
-.card input[type="checkbox"] {
-  position: absolute;
-  top: 5px;  /* minimalny margines, by nie zasłaniało wartości */
-  left: 5px;
-  z-index: 999; /* wysoki z-index, żeby nie zniknął pod tłem */
-  width: 20px;
-  height: 20px;
-}
+    #lastDiscardedLabel, #lastDiscardedCard {
+      color: #fff;
+      text-shadow: 1px 1px 2px #000;
+    }
 
+    /* Dolna połowa ekranu – akcje i karty gracza */
+    #bottomArea {
+      height: 50vh; /* dolne 50% */
+      background-color: rgba(0,0,0,0.2);
+      padding: 10px;
 
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px; /* odstęp pionowy */
+    }
+
+    /* Wiersz akcji – w jednej linii */
+    #playerActions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: nowrap;   /* nie zawijaj wiersza */
+      margin-bottom: 5px;
+    }
+
+    /* Karty w jednej linii, pionowy napis usunięty bo user go nie chciał */
+    #currentPlayerName {
+      font-weight: bold;
+    }
+
+    #tableGroupSelect {
+      margin-left: 5px;
+      padding: 5px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      color: #000;
+    }
+
+    button {
+      padding: 5px 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      cursor: pointer;
+      background: #8B4513; /* brąz */
+      color: #fff;
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Karty gracza */
+    #playersContainer {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 5px;
+    }
+
+    .card {
+      width: 90px;
+      height: 120px;
+      background-color: #f4f4f4;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      position: relative;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      margin: 3px;
+      color: #000;
+    }
+    .card input[type="checkbox"] {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      z-index: 999;
+      width: 20px;
+      height: 20px;
+    }
     .card.current-player {
       cursor: grab;
     }
@@ -134,40 +192,27 @@
       opacity: 0.5;
     }
 
-    button:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
     #errorMessage {
       color: red;
-      text-align: center;
       margin: 5px;
+      text-align: center;
     }
-    #discardPile {
-  background-size: contain;      /* żeby wypełniało obszar */
-  background-position: center;
-  background-repeat: no-repeat;
-}
   </style>
 </head>
 <body>
-  <!-- Obszar główny stołu -->
+  <!-- Górna połowa – stół z wyłożonymi kartami i stosami -->
   <div id="tableArea">
-    <!-- Lewa strona – stos dobierania -->
+    <!-- Lewa strona – stos dobierania z rewersem -->
     <div id="leftSide">
- <div class="pile" id="drawPile"
-       style="background-image: url('/static/cards/Cards-Back.svg');
-              background-size: contain;
-              background-position: center;
-              background-repeat: no-repeat;">
+      <div class="pile" id="drawPile"
+           style="background-image: url('/static/cards/Cards-Back.svg');">
       </div>
     </div>
 
-    <!-- Środkowe miejsce na karty wyłożone -->
+    <!-- Środkowe miejsce na wyłożone karty -->
     <div id="cardsOnTable"></div>
 
-    <!-- Prawa strona – stos wyrzucania i info o ostatniej karcie wyrzuconej -->
+    <!-- Prawa strona – stos wyrzucania -->
     <div id="rightSide">
       <div id="lastDiscardedLabel"></div>
       <span id="lastDiscardedCard"></span>
@@ -176,33 +221,37 @@
     </div>
   </div>
 
-  <!-- Dolna sekcja – przyciski + karty gracza -->
+  <!-- Dolna połowa – przyciski i aktualny gracz -->
   <div id="bottomArea">
-    <!-- Usunięto nagłówek "Akcje gracza" -->
-    <div id="playerActions" style="display:none;">
-      <p>Aktualny gracz: <span id="currentPlayerName"></span></p>
+    <div id="playerActions" style="display: none;">
+      <span id="currentPlayerName"></span>
+
       <button id="drawCardButton" onclick="drawCard()">Dobierz kartę</button>
       <button id="layDownButton" onclick="layDownSelected()" disabled>Wyłóż zaznaczone</button>
       <button id="discardCardButton" onclick="discardSelected()" disabled>Wyrzuć zaznaczoną</button>
 
-      <br/><br/>
-      <label>Wybierz grupę:
+      <label style="margin-left: 20px;">
+        Dołóż do grupy:
         <select id="tableGroupSelect"></select>
       </label>
       <button onclick="addCardsToTable()">Dołóż zaznaczone</button>
     </div>
 
     <div id="playersContainer">
-      <!-- Karty gracza – generowane dynamicznie -->
+      <!-- Tylko aktualny gracz i jego karty -->
     </div>
 
     <p id="errorMessage"></p>
   </div>
 
   <script>
-    /* -----------------------
-       LOGIKA JS (podobna do poprzedniej)
-       ----------------------- */
+    /*
+       LOGIKA JS – identyczna,
+       jedynie w renderCardsOnTable()
+       usuwamy <br/> i wstawiamy .group
+       z nowym style
+    */
+
     let gameId = null;
     let numPlayers = 2;
     let playersHands = [];
@@ -235,12 +284,14 @@
          cardsOnTable = data.cardsOnTable || [];
          lastDiscardedCard = data.lastDiscarded || null;
 
+         // Render interfejs
          renderPlayers();
          renderCardsOnTable(cardsOnTable);
          document.getElementById("lastDiscardedCard").textContent =
-           lastDiscardedCard ? lastDiscardedCard.name : "Brak";
+           lastDiscardedCard ? lastDiscardedCard.name : "";
 
-         document.getElementById("playerActions").style.display = "block";
+         // Pokaż panel akcji
+         document.getElementById("playerActions").style.display = "flex";
          updateUI();
        })
        .catch(err=>{
@@ -251,67 +302,58 @@
     function renderPlayers(){
       const container = document.getElementById("playersContainer");
       container.innerHTML = "";
-      for(let i=0; i<numPlayers; i++){
-        const div = document.createElement("div");
-        if(i === currentPlayerIndex){
-          div.innerHTML = `
-            <h2>Gracz ${i+1} (AKTYWNY)</h2>
-            ${ renderHand(playersHands[i], i) }
-          `;
-        } else {
-          div.innerHTML = `
-            <h2>Gracz ${i+1}</h2>
-            <p style="color:gray;">(Ukryte – czekaj na swoją turę)</p>
-          `;
-        }
-        container.appendChild(div);
-      }
+      const i = currentPlayerIndex;
+      let html = `
+        <h3>Gracz ${i+1}</h3>
+        ${renderHand(playersHands[i], i)}
+      `;
+      container.innerHTML = html;
     }
 
     function renderHand(hand, pIndex){
       return hand.map((cardObj, cIndex) => {
+        const cardFilename = getCardFilename(cardObj.name);
         return `
           <div class="card current-player"
+               style="background-image: url('/static/cards/${cardFilename}')"
                draggable="true"
                ondragstart="onDragStart(event, ${pIndex}, ${cIndex})"
                ondragover="onDragOver(event)"
                ondrop="onDrop(event, ${pIndex}, ${cIndex})">
-            <input type="checkbox" data-player="${pIndex}" data-card-id="${cardObj.id}"/>
-            ${cardObj.name}
+            <input type="checkbox" data-player="${pIndex}" data-card-id="${cardObj.id}" />
           </div>
         `;
       }).join("");
     }
 
-function renderCardsOnTable(tableData) {
-  const container = document.getElementById("cardsOnTable");
-  container.innerHTML = "";
+    function renderCardsOnTable(tableData){
+      const container = document.getElementById("cardsOnTable");
+      container.innerHTML = "";
 
-  tableData.forEach((group, gIndex) => {
-    // Dla każdej grupy mapujemy karty na DIV-y z tłem
-    let gHtml = group.map(cardObj => {
-      const cardFile = getCardFilename(cardObj.name);
-      return `
-        <div class="card"
-             style="
-               background-image: url('/static/cards/${cardFile}');
-               background-size: contain;
-               background-position: center;
-               background-repeat: no-repeat;
-             ">
-        </div>
-      `;
-    }).join("");
+      tableData.forEach((group, gIndex) => {
+        let gHtml = group.map(cardObj => {
+          const cardFile = getCardFilename(cardObj.name);
+          return `
+            <div class="card"
+                 style="
+                   background-image: url('/static/cards/${cardFile}');
+                   background-size: contain;
+                   background-position: center;
+                   background-repeat: no-repeat;
+                 ">
+            </div>
+          `;
+        }).join("");
 
-    container.innerHTML += `
-      <div class="group">
-        <strong>Grupa ${gIndex}:</strong><br/>
-        ${gHtml}
-      </div>
-    `;
-  });
-  updateTableGroupSelect();
-}
+        container.innerHTML += `
+          <div class="group">
+            <span class="group-title">Grupa ${gIndex}:</span>
+            ${gHtml}
+          </div>
+        `;
+      });
+      updateTableGroupSelect();
+    }
 
     function updateTableGroupSelect(){
       const sel = document.getElementById("tableGroupSelect");
@@ -333,7 +375,7 @@ function renderCardsOnTable(tableData) {
       enableDrawCard();
     }
 
-    // Drag & Drop
+    /* Drag & Drop reorder */
     function onDragStart(e, pIndex, cardIndex){
       if(e.target.type === "checkbox"){
         e.preventDefault();
@@ -350,20 +392,20 @@ function renderCardsOnTable(tableData) {
 
     function onDrop(e, pIndex, dropIndex){
       e.preventDefault();
-      const spIndex = parseInt(e.dataTransfer.getData("pIndex"),10);
-      const cIndex = parseInt(e.dataTransfer.getData("cardIndex"),10);
+      const spIndex = parseInt(e.dataTransfer.getData("pIndex"), 10);
+      const cIndex = parseInt(e.dataTransfer.getData("cardIndex"), 10);
       const draggedEl = document.querySelector(".card.dragging");
       if(draggedEl) draggedEl.classList.remove("dragging");
 
-      if(spIndex!==pIndex) return;
+      if(spIndex !== pIndex) return;
 
       const hand = playersHands[pIndex];
-      const [moved] = hand.splice(cIndex,1);
-      hand.splice(dropIndex,0,moved);
+      const [moved] = hand.splice(cIndex, 1);
+      hand.splice(dropIndex, 0, moved);
       renderPlayers();
       uncheckAll();
 
-      // Wyślij do serwera nową kolejność
+      // Wyślij nową kolejność do serwera
       const newOrderIds = hand.map(c => c.id);
       fetch(`/update_hand_order?game_id=${gameId}&playerIndex=${pIndex}`, {
         method: "POST",
@@ -374,13 +416,12 @@ function renderCardsOnTable(tableData) {
       .then(data=>{
         if(data.error){
           showError(data.error);
-          return;
         }
       })
       .catch(err => showError("Błąd update_hand_order: " + err));
     }
 
-    // Akcje
+    /* Akcje */
     function enableDrawCard(){
       document.getElementById("drawCardButton").disabled = false;
       document.getElementById("layDownButton").disabled = true;
@@ -408,12 +449,12 @@ function renderCardsOnTable(tableData) {
         clearError();
         enableLayDownAndDiscard();
       })
-      .catch(err=> showError("Błąd drawCard: "+err));
+      .catch(err => showError("Błąd drawCard: "+ err));
     }
 
     function layDownSelected(){
       const ids = getSelectedCardIDs(currentPlayerIndex);
-      if(ids.length<3){
+      if(ids.length < 3){
         showError("Musisz zaznaczyć >=3 karty!");
         return;
       }
@@ -439,16 +480,16 @@ function renderCardsOnTable(tableData) {
         clearError();
         enableLayDownAndDiscard();
       })
-      .catch(err=> showError(err));
+      .catch(err => showError(err));
     }
 
     function discardSelected(){
       const ids = getSelectedCardIDs(currentPlayerIndex);
-      if(ids.length===0){
+      if(ids.length === 0){
         showError("Zaznacz 1 kartę do wyrzucenia!");
         return;
       }
-      if(ids.length>1){
+      if(ids.length > 1){
         showError("Możesz wyrzucić tylko 1 kartę!");
         return;
       }
@@ -468,13 +509,21 @@ function renderCardsOnTable(tableData) {
           return;
         }
         if(data.game_over){
-          alert(data.info + "\nPunkty przegranego: "+data.punkty_przegranego);
+          const wantAgain = confirm(data.info + "\nPunkty przegranego: "
+                            + data.punkty_przegranego
+                            + "\nChcesz rozdać ponownie?");
+          if(wantAgain){
+            window.location.href = "/";
+          }
           return;
         }
         playersHands[currentPlayerIndex] = data.newHand;
         currentPlayerIndex = data.nextPlayerIndex;
+
         if(data.lastDiscardedCard){
-          document.getElementById("lastDiscardedCard").textContent = data.lastDiscardedCard.name;
+          const filename = getCardFilename(data.lastDiscardedCard.name);
+          document.getElementById("discardPile").style.backgroundImage
+            = `url('/static/cards/${filename}')`;
         }
         renderPlayers();
         uncheckAll();
@@ -482,7 +531,7 @@ function renderCardsOnTable(tableData) {
         enableDrawCard();
         updateUI();
       })
-      .catch(err=> showError(err));
+      .catch(err => showError(err));
     }
 
     function addCardsToTable(){
@@ -502,7 +551,7 @@ function renderCardsOnTable(tableData) {
           cards_ids: ids
         })
       })
-      .then(r => r.json())
+      .then(r=>r.json())
       .then(data => {
         if(data.error){
           showError(data.error);
@@ -523,11 +572,11 @@ function renderCardsOnTable(tableData) {
     function getSelectedCardIDs(pIndex){
       const boxes = document.querySelectorAll(`input[type="checkbox"][data-player="${pIndex}"]:checked`);
       const ids = [];
-      boxes.forEach(b=> ids.push(parseInt(b.getAttribute("data-card-id"),10)));
+      boxes.forEach(b => ids.push(parseInt(b.getAttribute("data-card-id"),10)));
       return ids;
     }
     function uncheckAll(){
-      document.querySelectorAll('input[type="checkbox"]').forEach(ch=> ch.checked=false);
+      document.querySelectorAll('input[type="checkbox"]').forEach(ch => ch.checked=false);
     }
     function showError(msg){
       document.getElementById("errorMessage").textContent = msg;
@@ -535,109 +584,25 @@ function renderCardsOnTable(tableData) {
     function clearError(){
       showError("");
     }
-      // 1. Mapowanie suits i rank => nazwa pliku
-  function mapPolishSuitToEnglish(polishSuit) {
-    switch(polishSuit.toLowerCase()) {
-      case "kier": return "Heart";
-      case "karo": return "Diamond";
-      case "pik":  return "Spade";
-      case "trefl":return "Club";
-      default: return polishSuit;
-    }
-  }
 
-  function getCardFilename(cardName) {
-    // Joker?
-    if (cardName.toLowerCase().includes("joker")) {
-      return "Cards-Joker.svg";
+    /* Mapowanie polskich nazw na pliki .svg */
+    function mapPolishSuitToEnglish(polishSuit) {
+      switch(polishSuit.toLowerCase()) {
+        case "kier": return "Heart";
+        case "karo": return "Diamond";
+        case "pik":  return "Spade";
+        case "trefl":return "Club";
+        default: return polishSuit;
+      }
     }
-    let [rank, suit] = cardName.split(" ");
-    suit = mapPolishSuitToEnglish(suit);
-    return `Cards-${rank}-${suit}.svg`;
-  }
-function discardSelected() {
-  const ids = getSelectedCardIDs(currentPlayerIndex);
-  if(ids.length===0) {
-    showError("Zaznacz 1 kartę do wyrzucenia!");
-    return;
-  }
-  if(ids.length>1){
-    showError("Możesz wyrzucić tylko 1 kartę!");
-    return;
-  }
-  const cid = ids[0];
-  fetch(`/discard_card?game_id=${gameId}`, {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({
-      playerIndex: currentPlayerIndex,
-      card_id: cid
-    })
-  })
-  .then(r=>r.json())
-  .then(data=>{
-    if(data.error){
-      showError(data.error);
-      return;
+    function getCardFilename(cardName) {
+      if(cardName.toLowerCase().includes("joker")){
+        return "Cards-Joker.svg";
+      }
+      let [rank, suit] = cardName.split(" ");
+      suit = mapPolishSuitToEnglish(suit);
+      return `Cards-${rank}-${suit}.svg`;
     }
-    if(data.game_over){
-      if(data.game_over){
-  const wantAgain = confirm(data.info + "\nPunkty przegranego: "
-                            + data.punkty_przegranego
-                            + "\nChcesz rozdać ponownie?");
-  if(wantAgain){
-    // prosty reload / ponowny start
-    window.location.href = "/";
-    // albo fetch("/start_game") – zależnie od Twojej logiki
-  }
-  return;
-}
-
-    }
-    // aktualizacja stanu
-    playersHands[currentPlayerIndex] = data.newHand;
-    currentPlayerIndex = data.nextPlayerIndex;
-
-    // *** kluczowa część: data.lastDiscardedCard zawiera np. { name: "5 Diamond", id: X }
-    if(data.lastDiscardedCard){
-      // generujemy nazwę pliku np. "Cards-5-Diamond.svg"
-      const filename = getCardFilename(data.lastDiscardedCard.name);
-      // set background
-      const discardPileDiv = document.getElementById("discardPile");
-      discardPileDiv.style.backgroundImage = `url('/static/cards/${filename}')`;
-    }
-
-    renderPlayers();
-    uncheckAll();
-    clearError();
-    enableDrawCard();
-    updateUI();
-  })
-  .catch(err => showError(err));
-}
-  function renderHand(hand, pIndex){
-    return hand.map((cardObj, cIndex) => {
-      const cardFilename = getCardFilename(cardObj.name);
-      return `
-        <div class="card current-player"
-             style="
-               background-image: url('/static/cards/${cardFilename}');
-               background-size: cover;
-               background-position: center;"
-             draggable="true"
-             ondragstart="onDragStart(event, ${pIndex}, ${cIndex})"
-             ondragover="onDragOver(event)"
-             ondrop="onDrop(event, ${pIndex}, ${cIndex})"
-        >
-          <input type="checkbox"
-                 data-player="${pIndex}"
-                 data-card-id="${cardObj.id}"
-                 style="position:absolute; top:30px; left:12px;"
-          />
-        </div>
-      `;
-    }).join("");
-  }
   </script>
 </body>
 </html>
