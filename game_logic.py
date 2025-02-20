@@ -329,17 +329,88 @@ def remove_by_indexes(cards, idxs):
     s = set(idxs)
     return [c for i,c in enumerate(cards) if i not in s]
 
+
 def sort_group_for_display(group):
     """
-    Sortuje karty w grupie rosnąco po wartości (2..14),
-    Jokery na koniec.
+    Zaawansowana wersja:
+    - Wypełnia luki w sekwencji, jeśli starczy Jokerów.
+    - Nadmiar Jokerów dokłada jako kolejne wartości (max+1, max+2...),
+      co wydłuża sekwencję z prawej strony.
+    - Ostatecznie sortuje i zwraca nową listę (z polami "assigned_value"
+      w Jokerach).
     """
+
+    # 1. Rozdzielamy normalne karty od Jokerów
+    jokers = [c for c in group if 'Joker' in c["name"]]
+    normal = [c for c in group if 'Joker' not in c["name"]]
+
+    if not normal:
+        # same jokery => np. przypisujemy im kolejne wartości 1,2...
+        # (lub dowolną logikę)
+        return group  # Albo w ogóle zostawiamy tak, bo i tak jest sam Joker
+
+    # 2. Sortuj normalne karty rosnąco po rank
+    normal_sorted = sorted(normal, key=lambda c: card_numeric_value(c))
+
+    # Zczytaj wartości w tablicy
+    ranks = [card_numeric_value(c) for c in normal_sorted]
+
+    # 3. Przygotuj "przypisane" jokery w tablicy np. assigned_jokers = []
+    assigned_jokers = []
+
+    # 4. Znajdź luki
+    #    iterujemy parami: (ranks[i], ranks[i+1]) i sprawdzamy różnicę
+    for i in range(len(ranks) - 1):
+        current_val = ranks[i]
+        next_val = ranks[i+1]
+        gap = next_val - current_val - 1
+        # np. 8 i 10 => gap=1 => brakuje 9
+        # mamy gap kart do uzupełnienia
+        while gap > 0 and jokers:
+            needed_val = current_val + 1  # brakująca wartość
+            # weź jednego Jokera i przypisz mu "assigned_value"
+            joker = jokers.pop(0)
+            joker["assigned_value"] = needed_val
+            assigned_jokers.append(joker)
+
+            current_val += 1
+            gap -= 1
+
+    # 5. Jeśli dalej są jokery, dołóż je z prawej strony sekwencji,
+    #    tzn. powyżej ranks[-1].
+    if jokers:
+        max_val = ranks[-1]
+        while jokers:
+            max_val += 1
+            j = jokers.pop(0)
+            j["assigned_value"] = max_val
+            assigned_jokers.append(j)
+
+    # 6. Teraz mamy normal_sorted (bez assigned_value) i assigned_jokers (z assigned_value).
+    #    Zbudujmy listę all_cards = normal_sorted + assigned_jokers
+    #    i posortujmy po final_value,
+    #    gdzie final_value(card) = card_numeric_value(card)
+    #    lub card["assigned_value"] jeśli to Joker.
+
+    all_cards = normal_sorted + assigned_jokers
+
+    # sort final
+    def final_value(c):
+        if 'Joker' in c["name"]:
+            return c.get("assigned_value", 0)
+        return card_numeric_value(c)
+
+    all_cards_sorted = sorted(all_cards, key=final_value)
+
+    return all_cards_sorted
+
+def card_numeric_value(card):
+    """
+    Pomocnicza funkcja – konwertuje "5 Pik" -> 5, "K Kier"->13,
+    "A Trefl"->14 itp.
+    """
+    rank_str = card["name"].split()[0]  # "5", "K", "A", ...
     valmap = {"J":11, "Q":12, "K":13, "A":14}
-    def card_value(c):
-        first = c["name"].split()[0]
-        if first.startswith("Joker"):
-            return 99
-        if first.isdigit():
-            return int(first)
-        return valmap.get(first, 0)
-    return sorted(group, key=card_value)
+    if rank_str.isdigit():
+        return int(rank_str)
+    return valmap.get(rank_str, 0)
